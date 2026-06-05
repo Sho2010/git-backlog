@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -46,7 +45,7 @@ func runOpen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	url := fmt.Sprintf("%s/view/%s", strings.TrimRight(cfg.BaseURL, "/"), key)
+	url := fmt.Sprintf("%s/view/%s", cfg.BaseURL, key)
 	return openURL(url)
 }
 

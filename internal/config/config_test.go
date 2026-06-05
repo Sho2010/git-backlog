@@ -165,6 +165,20 @@ func TestLoadIssuePatternFromEnv(t *testing.T) {
 	}
 }
 
+func TestLoadBaseURLTrailingSlashTrimmed(t *testing.T) {
+	setupRepo(t)
+	setLocal(t, "backlog.baseUrl", "https://x.backlog.jp///")
+	t.Setenv("BACKLOG_API_KEY", "secret")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.BaseURL != "https://x.backlog.jp" {
+		t.Errorf("BaseURL = %q, want trailing slashes trimmed", cfg.BaseURL)
+	}
+}
+
 func TestLoadInvalidTTL(t *testing.T) {
 	setupRepo(t)
 	setLocal(t, "backlog.baseUrl", "https://x.backlog.jp")

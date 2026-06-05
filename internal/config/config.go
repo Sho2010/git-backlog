@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Sho2010/git-backlog/internal/git"
@@ -44,6 +45,7 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	baseURL = strings.TrimRight(baseURL, "/")
 	if baseURL == "" {
 		return nil, fmt.Errorf("backlog.baseUrl is not set (git config --global backlog.baseUrl https://your-space.backlog.jp, or export %s=...)", BaseURLEnv)
 	}
