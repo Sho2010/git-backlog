@@ -1,0 +1,66 @@
+version: '3'
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build the git-backlog binary
+    cmds:
+      - go build -o git-backlog .
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - git-backlog
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./...
+
+  test:v:
+    desc: Run all tests (verbose)
+    cmds:
+      - go test -v ./...
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  check:
+    desc: vet + test
+    deps: [vet, test]
+
+  tidy:
+    desc: go mod tidy
+    cmds:
+      - go mod tidy
+
+  sandbox:
+    desc: (Re)create the sandbox git repo under tmp/sandbox-repo
+    deps: [build]
+    cmds:
+      - ./scripts/sandbox.sh
+
+  sandbox:run:
+    desc: 'Run the built git-backlog inside the sandbox repo (e.g. task sandbox:run -- list)'
+    deps: [build]
+    dir: tmp/sandbox-repo
+    cmds:
+      - ../../git-backlog {{.CLI_ARGS}}
+
+  install:
+    desc: Install git-backlog to $GOPATH/bin
+    cmds:
+      - go install .
+
+  clean:
+    desc: Remove built binary and tmp/
+    cmds:
+      - rm -f git-backlog
+      - rm -rf tmp/
