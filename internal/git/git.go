@@ -18,6 +18,20 @@ func CurrentBranch() (string, error) {
 	return strings.TrimSpace(out.String()), nil
 }
 
+func LocalBranches() ([]string, error) {
+	cmd := exec.Command("git", "for-each-ref", "--format=%(refname:short)", "refs/heads/")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("git for-each-ref: %w", err)
+	}
+	trimmed := strings.TrimSpace(out.String())
+	if trimmed == "" {
+		return nil, nil
+	}
+	return strings.Split(trimmed, "\n"), nil
+}
+
 func ConfigGet(key string) (string, bool, error) {
 	cmd := exec.Command("git", "config", "--get", key)
 	var out bytes.Buffer
