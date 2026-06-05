@@ -1,6 +1,7 @@
 package backlog
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -53,7 +54,7 @@ func TestGetIssue401SurfacesBody(t *testing.T) {
 	}
 }
 
-func TestGetIssue404(t *testing.T) {
+func TestGetIssue404ReturnsErrNotFound(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(`{"errors":[{"message":"No such issue.","code":6}]}`))
@@ -65,8 +66,8 @@ func TestGetIssue404(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error on 404")
 	}
-	if !strings.Contains(err.Error(), "404") {
-		t.Errorf("err = %v", err)
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("err = %v, want ErrNotFound", err)
 	}
 }
 

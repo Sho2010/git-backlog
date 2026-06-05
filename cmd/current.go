@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"text/template"
@@ -50,6 +51,12 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if known, err := c.IsKnownMissing(key); err != nil {
+		return err
+	} else if known {
+		return nil
+	}
+
 	issue, hit, err := c.Get(key)
 	if err != nil {
 		return err
@@ -61,6 +68,12 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 		}
 		client := backlog.NewClient(cfg.BaseURL, apiKey)
 		issue, err = client.GetIssue(key)
+		if errors.Is(err, backlog.ErrNotFound) {
+			if perr := c.PutMissing(key); perr != nil {
+				fmt.Fprintln(os.Stderr, "warning: cache write failed:", perr)
+			}
+			return nil
+		}
 		if err != nil {
 			return err
 		}

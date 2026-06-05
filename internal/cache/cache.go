@@ -36,6 +36,10 @@ func (c *Cache) path(issueKey string) string {
 	return filepath.Join(c.Dir, issueKey+".json")
 }
 
+func (c *Cache) missingPath(issueKey string) string {
+	return filepath.Join(c.Dir, issueKey+".missing")
+}
+
 func (c *Cache) Get(issueKey string) (*backlog.Issue, bool, error) {
 	p := c.path(issueKey)
 	info, err := os.Stat(p)
@@ -71,6 +75,33 @@ func (c *Cache) Put(issue *backlog.Issue) error {
 	}
 	if err := os.Rename(tmp, p); err != nil {
 		return fmt.Errorf("rename cache: %w", err)
+	}
+	_ = os.Remove(c.missingPath(issue.IssueKey))
+	return nil
+}
+
+func (c *Cache) IsKnownMissing(issueKey string) (bool, error) {
+	info, err := os.Stat(c.missingPath(issueKey))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("stat missing marker: %w", err)
+	}
+	if time.Since(info.ModTime()) > c.TTL {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (c *Cache) PutMissing(issueKey string) error {
+	p := c.missingPath(issueKey)
+	tmp := p + ".tmp"
+	if err := os.WriteFile(tmp, nil, 0o644); err != nil {
+		return fmt.Errorf("write missing marker: %w", err)
+	}
+	if err := os.Rename(tmp, p); err != nil {
+		return fmt.Errorf("rename missing marker: %w", err)
 	}
 	return nil
 }

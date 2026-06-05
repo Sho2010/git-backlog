@@ -2,12 +2,15 @@ package backlog
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
 )
+
+var ErrNotFound = errors.New("issue not found")
 
 type Issue struct {
 	ID          int64  `json:"id"`
@@ -49,6 +52,9 @@ func (c *Client) GetIssue(issueKey string) (*Issue, error) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("%w: %s: %s", ErrNotFound, issueKey, string(body))
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("backlog API %s returned %d: %s", issueKey, resp.StatusCode, string(body))

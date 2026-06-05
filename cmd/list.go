@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -17,10 +18,11 @@ import (
 )
 
 type listRow struct {
-	Branch   string
-	IssueKey string
-	Summary  string
-	Resolved bool
+	Branch    string
+	IssueKey  string
+	Summary   string
+	Resolved  bool
+	Unmanaged bool // branch's key isn't a real Backlog issue (404 cached)
 }
 
 var (
@@ -60,7 +62,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	rows := make([]listRow, 0, len(branches))
-	var missing []string
+	var toFetch []string
 	for _, b := range branches {
 		key, ok, err := issuekey.Extract(b, cfg.IssuePattern)
 		if err != nil {
@@ -77,8 +79,12 @@ func runList(cmd *cobra.Command, args []string) error {
 		if hit {
 			row.Summary = issue.Summary
 			row.Resolved = true
+		} else if known, err := c.IsKnownMissing(key); err != nil {
+			return err
+		} else if known {
+			row.Unmanaged = true
 		} else {
-			missing = append(missing, key)
+			toFetch = append(toFetch, key)
 		}
 		rows = append(rows, row)
 	}
@@ -87,19 +93,25 @@ func runList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if !listNoFetch && len(missing) > 0 {
+	if !listNoFetch && len(toFetch) > 0 {
 		apiKey, err := cfg.APIKey()
 		if err != nil {
 			return err
 		}
 		client := backlog.NewClient(cfg.BaseURL, apiKey)
-		fetched := fetchKeys(c, client, missing, listConcurrency)
+		fetched := fetchKeys(c, client, toFetch, listConcurrency)
 		for i := range rows {
-			if rows[i].Resolved {
+			if rows[i].Resolved || rows[i].Unmanaged {
 				continue
 			}
-			if issue, ok := fetched[rows[i].IssueKey]; ok {
-				rows[i].Summary = issue.Summary
+			fr, ok := fetched[rows[i].IssueKey]
+			if !ok {
+				continue
+			}
+			if fr.Unmanaged {
+				rows[i].Unmanaged = true
+			} else if fr.Issue != nil {
+				rows[i].Summary = fr.Issue.Summary
 				rows[i].Resolved = true
 			}
 		}
@@ -111,13 +123,18 @@ func runList(cmd *cobra.Command, args []string) error {
 	return renderListPlain(rows)
 }
 
-func fetchKeys(c *cache.Cache, client *backlog.Client, keys []string, concurrency int) map[string]*backlog.Issue {
+type fetchResult struct {
+	Issue     *backlog.Issue
+	Unmanaged bool
+}
+
+func fetchKeys(c *cache.Cache, client *backlog.Client, keys []string, concurrency int) map[string]fetchResult {
 	if concurrency < 1 {
 		concurrency = 1
 	}
 	type res struct {
-		key   string
-		issue *backlog.Issue
+		key string
+		fr  fetchResult
 	}
 	results := make(chan res, len(keys))
 	sem := make(chan struct{}, concurrency)
@@ -129,6 +146,13 @@ func fetchKeys(c *cache.Cache, client *backlog.Client, keys []string, concurrenc
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			issue, err := client.GetIssue(key)
+			if errors.Is(err, backlog.ErrNotFound) {
+				if err := c.PutMissing(key); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: cache write %s failed: %v\n", key, err)
+				}
+				results <- res{key: key, fr: fetchResult{Unmanaged: true}}
+				return
+			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "warning: fetch %s failed: %v\n", key, err)
 				results <- res{key: key}
@@ -137,17 +161,15 @@ func fetchKeys(c *cache.Cache, client *backlog.Client, keys []string, concurrenc
 			if err := c.Put(issue); err != nil {
 				fmt.Fprintf(os.Stderr, "warning: cache write %s failed: %v\n", key, err)
 			}
-			results <- res{key: key, issue: issue}
+			results <- res{key: key, fr: fetchResult{Issue: issue}}
 		}(k)
 	}
 	wg.Wait()
 	close(results)
 
-	out := make(map[string]*backlog.Issue, len(keys))
+	out := make(map[string]fetchResult, len(keys))
 	for r := range results {
-		if r.issue != nil {
-			out[r.key] = r.issue
-		}
+		out[r.key] = r.fr
 	}
 	return out
 }
@@ -156,12 +178,15 @@ func renderListPlain(rows []listRow) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	for _, r := range rows {
 		summary := r.Summary
-		if !r.Resolved {
-			if listNoFetch {
-				summary = "(uncached — drop --no-fetch or run `git backlog sync`)"
-			} else {
-				summary = "(unresolved)"
-			}
+		switch {
+		case r.Resolved:
+			// keep r.Summary
+		case r.Unmanaged:
+			summary = "(unmanaged)"
+		case listNoFetch:
+			summary = "(uncached — drop --no-fetch or run `git backlog sync`)"
+		default:
+			summary = "(unresolved)"
 		}
 		fmt.Fprintf(w, "%s\t%s\t%s\n", r.IssueKey, r.Branch, summary)
 	}

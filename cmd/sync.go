@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -34,7 +35,7 @@ func init() {
 
 type syncResult struct {
 	Key    string
-	Status string // "fetched", "cached", "error"
+	Status string // "fetched", "cached", "unmanaged", "error"
 	Err    error
 }
 
@@ -109,21 +110,24 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 	sort.Slice(collected, func(i, j int) bool { return collected[i].Key < collected[j].Key })
 
-	var fetched, cached, failed int
+	var fetched, cached, unmanaged, failed int
 	for _, r := range collected {
 		switch r.Status {
 		case "fetched":
 			fetched++
-			fmt.Printf("fetched  %s\n", r.Key)
+			fmt.Printf("fetched    %s\n", r.Key)
 		case "cached":
 			cached++
-			fmt.Printf("cached   %s\n", r.Key)
+			fmt.Printf("cached     %s\n", r.Key)
+		case "unmanaged":
+			unmanaged++
+			fmt.Printf("unmanaged  %s\n", r.Key)
 		case "error":
 			failed++
-			fmt.Fprintf(os.Stderr, "error    %s: %v\n", r.Key, r.Err)
+			fmt.Fprintf(os.Stderr, "error      %s: %v\n", r.Key, r.Err)
 		}
 	}
-	fmt.Fprintf(os.Stderr, "\n%d fetched, %d cached, %d failed\n", fetched, cached, failed)
+	fmt.Fprintf(os.Stderr, "\n%d fetched, %d cached, %d unmanaged, %d failed\n", fetched, cached, unmanaged, failed)
 	if failed > 0 {
 		return fmt.Errorf("%d issue(s) failed to sync", failed)
 	}
@@ -135,8 +139,17 @@ func fetchOne(c *cache.Cache, client *backlog.Client, key string, force bool) sy
 		if _, hit, err := c.Get(key); err == nil && hit {
 			return syncResult{Key: key, Status: "cached"}
 		}
+		if known, err := c.IsKnownMissing(key); err == nil && known {
+			return syncResult{Key: key, Status: "unmanaged"}
+		}
 	}
 	issue, err := client.GetIssue(key)
+	if errors.Is(err, backlog.ErrNotFound) {
+		if err := c.PutMissing(key); err != nil {
+			return syncResult{Key: key, Status: "error", Err: err}
+		}
+		return syncResult{Key: key, Status: "unmanaged"}
+	}
 	if err != nil {
 		return syncResult{Key: key, Status: "error", Err: err}
 	}

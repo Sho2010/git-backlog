@@ -56,7 +56,11 @@ git backlog list --format='{{.Branch}} {{.IssueKey}} {{.Summary}}' | fzf
 Available template fields:
 
 - `current`: `IssueKey`, `Summary`, `ID`, `Description`
-- `list`: `Branch`, `IssueKey`, `Summary`, `Resolved`
+- `list`: `Branch`, `IssueKey`, `Summary`, `Resolved`, `Unmanaged`
+
+A branch whose issue key matches the pattern but doesn't exist in Backlog
+(API 404) is marked **unmanaged**. The 404 result is cached so subsequent
+runs don't re-hit the API. `current` and `sync` honor the same marker.
 
 ## Development
 

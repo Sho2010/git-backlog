@@ -81,6 +81,65 @@ func TestGetMissOnCorruptJSON(t *testing.T) {
 	}
 }
 
+func TestMissingMarker(t *testing.T) {
+	c := newTestCache(t, time.Hour)
+
+	known, err := c.IsKnownMissing("MISS-1")
+	if err != nil {
+		t.Fatalf("IsKnownMissing(absent): %v", err)
+	}
+	if known {
+		t.Fatal("expected false when no marker exists")
+	}
+
+	if err := c.PutMissing("MISS-1"); err != nil {
+		t.Fatalf("PutMissing: %v", err)
+	}
+
+	known, err = c.IsKnownMissing("MISS-1")
+	if err != nil {
+		t.Fatalf("IsKnownMissing: %v", err)
+	}
+	if !known {
+		t.Fatal("expected true after PutMissing")
+	}
+}
+
+func TestMissingMarkerExpires(t *testing.T) {
+	c := newTestCache(t, time.Minute)
+	if err := c.PutMissing("EXP-1"); err != nil {
+		t.Fatalf("PutMissing: %v", err)
+	}
+	old := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(c.missingPath("EXP-1"), old, old); err != nil {
+		t.Fatalf("Chtimes: %v", err)
+	}
+	known, err := c.IsKnownMissing("EXP-1")
+	if err != nil {
+		t.Fatalf("IsKnownMissing: %v", err)
+	}
+	if known {
+		t.Fatal("expected expired marker to count as not-known")
+	}
+}
+
+func TestPutClearsMissingMarker(t *testing.T) {
+	c := newTestCache(t, time.Hour)
+	if err := c.PutMissing("RECOV-1"); err != nil {
+		t.Fatalf("PutMissing: %v", err)
+	}
+	if err := c.Put(&backlog.Issue{IssueKey: "RECOV-1", Summary: "now exists"}); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	known, err := c.IsKnownMissing("RECOV-1")
+	if err != nil {
+		t.Fatalf("IsKnownMissing: %v", err)
+	}
+	if known {
+		t.Fatal("expected marker cleared after successful Put")
+	}
+}
+
 func TestPutIsAtomic(t *testing.T) {
 	c := newTestCache(t, time.Hour)
 	issue := &backlog.Issue{IssueKey: "ATOM-1", Summary: "x"}
