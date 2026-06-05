@@ -35,7 +35,7 @@ func (c *Client) GetIssue(issueKey string) (*Issue, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse baseURL: %w", err)
 	}
-	u.Path = "/api/v2/issues/" + url.PathEscape(issueKey)
+	u.Path = "/api/v2/issues/" + issueKey
 	q := u.Query()
 	q.Set("apiKey", c.APIKey)
 	u.RawQuery = q.Encode()
