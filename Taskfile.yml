@@ -8,8 +8,11 @@ tasks:
 
   build:
     desc: Build the git-backlog binary
+    vars:
+      VERSION:
+        sh: git describe --tags --always --dirty 2>/dev/null || echo dev
     cmds:
-      - go build -o git-backlog .
+      - go build -ldflags="-X 'github.com/Sho2010/git-backlog/cmd.Version={{.VERSION}}'" -o git-backlog .
     sources:
       - "**/*.go"
       - go.mod
@@ -53,6 +56,11 @@ tasks:
     dir: tmp/sandbox-repo
     cmds:
       - ../../git-backlog {{.CLI_ARGS}}
+
+  fake-backlog:
+    desc: 'Run the fake Backlog API server on :18080 (export BACKLOG_BASE_URL=http://localhost:18080 in the sandbox shell)'
+    cmds:
+      - go run ./cmd/fake-backlog
 
   install:
     desc: Install git-backlog to $GOPATH/bin
