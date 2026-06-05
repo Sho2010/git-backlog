@@ -12,6 +12,10 @@ const (
 	DefaultIssuePattern = `[A-Z][A-Z0-9_]*-[0-9]+`
 	DefaultAPIKeyEnv    = "BACKLOG_API_KEY"
 	DefaultCacheTTL     = 24 * time.Hour
+
+	BaseURLEnv      = "BACKLOG_BASE_URL"
+	APIKeyEnvEnv    = "BACKLOG_API_KEY_ENV"
+	IssuePatternEnv = "BACKLOG_ISSUE_PATTERN"
 )
 
 type Config struct {
@@ -21,29 +25,37 @@ type Config struct {
 	CacheTTL     time.Duration
 }
 
+func resolve(envName, configKey, fallback string) (string, error) {
+	if v := os.Getenv(envName); v != "" {
+		return v, nil
+	}
+	v, _, err := git.ConfigGet(configKey)
+	if err != nil {
+		return "", err
+	}
+	if v != "" {
+		return v, nil
+	}
+	return fallback, nil
+}
+
 func Load() (*Config, error) {
-	baseURL, ok, err := git.ConfigGet("backlog.baseUrl")
+	baseURL, err := resolve(BaseURLEnv, "backlog.baseUrl", "")
 	if err != nil {
 		return nil, err
 	}
-	if !ok || baseURL == "" {
-		return nil, fmt.Errorf("backlog.baseUrl is not set (git config --global backlog.baseUrl https://your-space.backlog.jp)")
+	if baseURL == "" {
+		return nil, fmt.Errorf("backlog.baseUrl is not set (git config --global backlog.baseUrl https://your-space.backlog.jp, or export %s=...)", BaseURLEnv)
 	}
 
-	apiKeyEnv, _, err := git.ConfigGet("backlog.apiKeyEnv")
+	apiKeyEnv, err := resolve(APIKeyEnvEnv, "backlog.apiKeyEnv", DefaultAPIKeyEnv)
 	if err != nil {
 		return nil, err
-	}
-	if apiKeyEnv == "" {
-		apiKeyEnv = DefaultAPIKeyEnv
 	}
 
-	pattern, _, err := git.ConfigGet("backlog.issuePattern")
+	pattern, err := resolve(IssuePatternEnv, "backlog.issuePattern", DefaultIssuePattern)
 	if err != nil {
 		return nil, err
-	}
-	if pattern == "" {
-		pattern = DefaultIssuePattern
 	}
 
 	ttlStr, _, err := git.ConfigGet("backlog.cacheTTL")
@@ -64,6 +76,10 @@ func Load() (*Config, error) {
 		IssuePattern: pattern,
 		CacheTTL:     ttl,
 	}, nil
+}
+
+func IssuePattern() (string, error) {
+	return resolve(IssuePatternEnv, "backlog.issuePattern", DefaultIssuePattern)
 }
 
 func (c *Config) APIKey() (string, error) {

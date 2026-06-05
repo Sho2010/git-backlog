@@ -10,6 +10,9 @@ func setupRepo(t *testing.T) {
 	t.Helper()
 	t.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")
 	t.Setenv("GIT_CONFIG_SYSTEM", "/dev/null")
+	for _, e := range []string{BaseURLEnv, APIKeyEnvEnv, IssuePatternEnv} {
+		t.Setenv(e, "")
+	}
 	t.Chdir(t.TempDir())
 	if out, err := exec.Command("git", "init", "-q").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, out)
@@ -93,6 +96,72 @@ func TestAPIKeyEmptyErrors(t *testing.T) {
 	}
 	if _, err := cfg.APIKey(); err == nil {
 		t.Fatal("expected error for empty API key env var")
+	}
+}
+
+func TestLoadBaseURLFromEnv(t *testing.T) {
+	setupRepo(t)
+	t.Setenv(BaseURLEnv, "https://env.backlog.jp")
+	t.Setenv("BACKLOG_API_KEY", "secret")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.BaseURL != "https://env.backlog.jp" {
+		t.Errorf("BaseURL = %q, want env value", cfg.BaseURL)
+	}
+}
+
+func TestLoadEnvOverridesGitConfig(t *testing.T) {
+	setupRepo(t)
+	setLocal(t, "backlog.baseUrl", "https://config.backlog.jp")
+	t.Setenv(BaseURLEnv, "https://env.backlog.jp")
+	t.Setenv("BACKLOG_API_KEY", "secret")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.BaseURL != "https://env.backlog.jp" {
+		t.Errorf("BaseURL = %q, env should win over git config", cfg.BaseURL)
+	}
+}
+
+func TestLoadAPIKeyEnvFromEnv(t *testing.T) {
+	setupRepo(t)
+	setLocal(t, "backlog.baseUrl", "https://x.backlog.jp")
+	t.Setenv(APIKeyEnvEnv, "MY_PAT")
+	t.Setenv("MY_PAT", "secret")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.APIKeyEnv != "MY_PAT" {
+		t.Errorf("APIKeyEnv = %q, want env override", cfg.APIKeyEnv)
+	}
+	key, err := cfg.APIKey()
+	if err != nil {
+		t.Fatalf("APIKey: %v", err)
+	}
+	if key != "secret" {
+		t.Errorf("APIKey = %q", key)
+	}
+}
+
+func TestLoadIssuePatternFromEnv(t *testing.T) {
+	setupRepo(t)
+	setLocal(t, "backlog.baseUrl", "https://x.backlog.jp")
+	t.Setenv(IssuePatternEnv, `XX-[0-9]+`)
+	t.Setenv("BACKLOG_API_KEY", "secret")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.IssuePattern != `XX-[0-9]+` {
+		t.Errorf("IssuePattern = %q, want env override", cfg.IssuePattern)
 	}
 }
 

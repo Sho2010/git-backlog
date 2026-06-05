@@ -15,14 +15,14 @@ as a git subcommand.
 
 ## Settings
 
-All settings are read via `git config` (precedence: `--local` > `--global` > built-in default).
+Precedence: **env var > `git config --local` > `git config --global` > built-in default**.
 
-| Key | Default | Description |
-|---|---|---|
-| `backlog.baseUrl` | _(required)_ | Backlog space URL, e.g. `https://your-space.backlog.jp` |
-| `backlog.apiKeyEnv` | `BACKLOG_API_KEY` | Name of the env var holding the PAT |
-| `backlog.issuePattern` | `[A-Z][A-Z0-9_]*-[0-9]+` | Regex applied to branch names to extract the issue key. First match wins. |
-| `backlog.cacheTTL` | `24h` | Cache lifetime in Go duration format (`1m`, `2h`, …) |
+| Git config key | Env var override | Default | Description |
+|---|---|---|---|
+| `backlog.baseUrl` | `BACKLOG_BASE_URL` | _(required)_ | Backlog space URL, e.g. `https://your-space.backlog.jp` |
+| `backlog.apiKeyEnv` | `BACKLOG_API_KEY_ENV` | `BACKLOG_API_KEY` | Name of the env var holding the PAT |
+| `backlog.issuePattern` | `BACKLOG_ISSUE_PATTERN` | `[A-Z][A-Z0-9_]*-[0-9]+` | Regex applied to branch names to extract the issue key. First match wins. |
+| `backlog.cacheTTL` | _(none)_ | `24h` | Cache lifetime in Go duration format (`1m`, `2h`, …) |
 
 The PAT itself is read from the env var named by `backlog.apiKeyEnv` and is
 never stored in git config. Cache files live under

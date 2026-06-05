@@ -28,12 +28,9 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	pattern, _, err := git.ConfigGet("backlog.issuePattern")
+	pattern, err := config.IssuePattern()
 	if err != nil {
 		return err
-	}
-	if pattern == "" {
-		pattern = config.DefaultIssuePattern
 	}
 	key, ok, err := issuekey.Extract(branch, pattern)
 	if err != nil {
