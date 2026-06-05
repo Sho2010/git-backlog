@@ -16,7 +16,7 @@ const (
 
 type Config struct {
 	BaseURL      string
-	APIKey       string
+	APIKeyEnv    string
 	IssuePattern string
 	CacheTTL     time.Duration
 }
@@ -36,10 +36,6 @@ func Load() (*Config, error) {
 	}
 	if apiKeyEnv == "" {
 		apiKeyEnv = DefaultAPIKeyEnv
-	}
-	apiKey := os.Getenv(apiKeyEnv)
-	if apiKey == "" {
-		return nil, fmt.Errorf("API key env var %q is empty", apiKeyEnv)
 	}
 
 	pattern, _, err := git.ConfigGet("backlog.issuePattern")
@@ -64,8 +60,16 @@ func Load() (*Config, error) {
 
 	return &Config{
 		BaseURL:      baseURL,
-		APIKey:       apiKey,
+		APIKeyEnv:    apiKeyEnv,
 		IssuePattern: pattern,
 		CacheTTL:     ttl,
 	}, nil
+}
+
+func (c *Config) APIKey() (string, error) {
+	key := os.Getenv(c.APIKeyEnv)
+	if key == "" {
+		return "", fmt.Errorf("API key env var %q is empty", c.APIKeyEnv)
+	}
+	return key, nil
 }

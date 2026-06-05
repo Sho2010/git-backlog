@@ -58,7 +58,11 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !hit {
-		client := backlog.NewClient(cfg.BaseURL, cfg.APIKey)
+		apiKey, err := cfg.APIKey()
+		if err != nil {
+			return err
+		}
+		client := backlog.NewClient(cfg.BaseURL, apiKey)
 		issue, err = client.GetIssue(key)
 		if err != nil {
 			return err
