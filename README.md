@@ -40,7 +40,7 @@ export BACKLOG_API_KEY=xxxxxxxx
 | Command | Description |
 |---|---|
 | `git backlog` / `git backlog current` | Print the current branch's issue title |
-| `git backlog list` | List local branches with cached issue titles |
+| `git backlog list [--no-fetch] [--concurrency N]` | List local branches with their issue titles (auto-fetches missing entries by default) |
 | `git backlog open` | Open the current branch's issue in the browser |
 | `git backlog sync [--force] [--concurrency N]` | Fetch all branches' issues into cache |
 
@@ -56,7 +56,7 @@ git backlog list --format='{{.Branch}} {{.IssueKey}} {{.Summary}}' | fzf
 Available template fields:
 
 - `current`: `IssueKey`, `Summary`, `ID`, `Description`
-- `list`: `Branch`, `IssueKey`, `Summary`, `Cached`
+- `list`: `Branch`, `IssueKey`, `Summary`, `Resolved`
 
 ## Development
 
