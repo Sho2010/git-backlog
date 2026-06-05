@@ -30,6 +30,9 @@ go.work.sum
 # Built binary
 /git-backlog
 
+# Local sandbox / scratch
+/tmp/
+
 # Editor/IDE
 # .idea/
 # .vscode/
